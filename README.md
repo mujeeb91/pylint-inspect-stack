@@ -22,7 +22,20 @@ my_stack(*args) # should be a warning here
 ```
 def stack():
     pass
-stack() # should be a warning here
+stack() # should not be a warning here
+```
+
+#### Case 5
+```
+import inspect as foo
+foo.stack() # should be a warning here
+```
+
+#### Case 6 (not yet handled)
+```
+from inspect import stack
+foo = stack
+foo() # should be a warning here
 ```
 
 ### How to use this in other projects

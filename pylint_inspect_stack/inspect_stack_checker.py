@@ -1,42 +1,58 @@
 from pylint.checkers import BaseChecker
+import astroid
 
 class InspectStackChecker(BaseChecker):
-    # Define the checker class
+    """
+    A custom Pylint checker to warn when `inspect.stack()` is called.
+    """
+
     name = "inspect-stack-checker"
-    priority = -1  # Priority level for the checker
     msgs = {
         "W0001": (
-            "Usage of stack() detected. Avoid using it.",
-            "inspect-stack-used",
-            "Triggered when stack() is found in the code.",
+            "Avoid using `inspect.stack()` as it can have performance implications.",
+            "inspect-stack",
+            "Warns against using `inspect.stack()`.",
         ),
     }
 
     def __init__(self, linter=None):
         super().__init__(linter)
-        # Tracks aliases of `inspect.stack`
-        self.aliases = set()
+        self.aliases = {}  # Initialize aliases as a dictionary
+
+    def visit_import(self, node):
+        """
+        Track imports like `import inspect` or `import inspect as foo`.
+        """
+        for name, alias in node.names:
+            if name == "inspect":
+                self.aliases[alias or name] = name  # Correct dictionary assignment
 
     def visit_importfrom(self, node):
         """
-        Track aliases in 'from inspect import stack as alias' or similar.
+        Track imports like `from inspect import stack` or `from inspect import stack as foo`.
         """
         if node.modname == "inspect":
             for name, alias in node.names:
                 if name == "stack":
-                    # Track alias or name directly if no alias is used
-                    self.aliases.add(alias or name)
-    
+                    self.aliases[alias or name] = "stack"  # Correct dictionary assignment
+
     def visit_call(self, node):
         """
-        Check for calls to `stack()` from inspect or any tracked alias.
+        Check function calls for `inspect.stack()` or aliases like `foo.stack()`.
         """
-        try:
-            func_name = node.func.as_string()
-            if func_name == "inspect.stack" or func_name in self.aliases:
-                self.add_message("W0001", node=node)
-        except AttributeError:
-            pass
+        if isinstance(node.func, astroid.Attribute):
+            # Handle cases like `inspect.stack()` or `foo.stack()`
+            if (
+                node.func.attrname == "stack"
+                and isinstance(node.func.expr, astroid.Name)
+                and node.func.expr.name in self.aliases
+            ):
+                self.add_message("inspect-stack", node=node)
+
+        elif isinstance(node.func, astroid.Name):
+            # Handle cases like `stack()` when imported directly
+            if node.func.name in self.aliases and self.aliases[node.func.name] == "stack":
+                self.add_message("inspect-stack", node=node)
 
 # Register the checker with Pylint
 def register(linter):
