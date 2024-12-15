@@ -50,8 +50,11 @@ class InspectStackChecker(BaseChecker):
                 self.add_message("inspect-stack", node=node)
 
         elif isinstance(node.func, astroid.Name):
-            # Handle cases like `stack()` when imported directly
+            # Handle cases like `stack()` when imported directly or through `foo = stack`
+            inferred = next(node.func.infer(), None)
             if node.func.name in self.aliases and self.aliases[node.func.name] == "stack":
+                self.add_message("inspect-stack", node=node)
+            elif inferred and inferred.parent.name == "inspect" and inferred.name == "stack":
                 self.add_message("inspect-stack", node=node)
 
 # Register the checker with Pylint
